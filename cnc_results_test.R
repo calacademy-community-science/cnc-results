@@ -1,9 +1,11 @@
 #'############################################################################
-#'
-#'
-
-
-
+#' City Nature Challenge results test
+#' 
+#' CNC team needs: number of observations, species, observers for each city
+#' at its particular cut-off time (based on time zone)
+#' 
+#' This is testing to see if we can pull those numbers just using iNat 
+#' API filters
 
 
 # Libraries
@@ -126,7 +128,7 @@ safely_get_cnc_stats <- purrr::safely(.f = get_cnc_stats)
 
 
 # test
-filtered_project_results_test <- purrr::map(cnc_sheet$project_id[1:30], safely_get_cnc_stats)
+filtered_project_results_test <- purrr::map(cnc_sheet$project_id, safely_get_cnc_stats)
 
 
 ###############################################################################
