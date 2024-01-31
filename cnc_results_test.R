@@ -1,11 +1,16 @@
-#############################################################################
+#'############################################################################
+#'
+#'
 
+
+
+
+
+# Libraries
 library(tidyverse)
 library(jsonlite)
 library(httr)
 
-
-#############################################################################
 
 
 # function to get total number of observations
@@ -18,7 +23,6 @@ get_inat_observation_number <- purrr:::slowly(
     return(max_results)
   }, rate = rate_delay(2))
 
-
 # Function for getting inat data 
 ## this is throttled with a delay of 1 second
 get_inat_data <- purrr:::slowly(function(x) {
@@ -26,11 +30,23 @@ get_inat_data <- purrr:::slowly(function(x) {
 }, rate = rate_delay(1))
 
 
+# Function to parse project name from iNat links in results sheet
+get_project_name <- function(link){
+  link_sections <- (link %>% str_split(pattern = "/projects/"))[[1]] 
+  if(length(link_sections) == 2){
+    name <- link_sections[2]
+  } else {name <- NA}
+  return(name)
+}
 
-# umbrella project
-umbrella_project_link <- 'https://api.inaturalist.org/v1/observations/umbrella_project_stats?project_id=city-nature-challenge-2023'
+# Function to parse cut-off datetime from current date notation in results sheet
+generate_cutoff_date <- function(dt){
+  day <-(str_squish(dt) %>%
+           str_split(pattern = " "))[[1]][2]
+  paste0("2023-05-",
+         str_pad(day,width=2, pad = 0))
+}
 
-umbrella_results <-fromJSON(content(GET(umbrella_project_link), as = "text"))$results 
 
 #############################################################################
 
@@ -41,24 +57,6 @@ species_query <- "https://api.inaturalist.org/v1/observations/species_counts?pro
 people_query <- "https://api.inaturalist.org/v1/observations/observers?project_id="
 
 
-# pull individual project results - no datetime filters
-project_results <- purrr::map_df(umbrella_results$project_id[1:20], function(id){
-  obs <- get_inat_observation_number(paste0(obs_query,id))
-  species <- get_inat_observation_number(paste0(species_query,id))
-  people <- get_inat_observation_number(paste0(people_query,id))
-  tibble(project_id = id,
-         project_title = umbrella_results %>% 
-           filter(project_id == id) %>% 
-           pull(project) %>% 
-           pull(title),
-         project_obs = obs,
-         project_species = species,
-         project_people = people
-         )
-})
-
-
-#############################################################################
 
 #' test code to filter data for the desired cut-off datetime
 #' 
@@ -70,34 +68,15 @@ project_results <- purrr::map_df(umbrella_results$project_id[1:20], function(id)
 #'  1. all records created before the cut-off
 #'  2. all records created before the cut-off and modified after the cut-off
 #'  
-#'  and subtracting 2 from 1 to get 
+#'  and subtracting #2 from #1 to get records created+updated before cut-off
 #'  
-#' if we are running the requests within a day of the cut-off times, expect 2
+#' if we are running the requests within a day of the cut-off times, expect #2
 #' to be small, not sure if it's significant enough for CNC reporting
 
 
 
 
-# test this with 2023 CNC data
-
-
-# function to parse project name from iNat links
-get_project_name <- function(link){
-  link_sections <- (link %>% str_split(pattern = "/projects/"))[[1]] 
-  if(length(link_sections) == 2){
-    name <- link_sections[2]
-  } else {name <- NA}
-  return(name)
-}
-
-# function to parse cut-off datetime from current date notation
-generate_cutoff_date <- function(dt){
-  day <-(str_squish(dt) %>%
-    str_split(pattern = " "))[[1]][2]
-  paste0("2023-05-",
-         str_pad(day,width=2, pad = 0))
-}
-
+# test this with 2023 CNC projects
 
 # import 2023 CNC results doc and parse project name, create cut-off datetime
 cnc_sheet <- read_csv("data/Reference Copy of CNC 2023 RESULTS - RESULTS MASTER.csv") %>%
@@ -142,20 +121,12 @@ get_cnc_stats <- function(id){
 }
 
 
-
-# create safely() wrapper for the get_cnc_stats function
+# create safely wrapper for the get_cnc_stats function
 safely_get_cnc_stats <- purrr::safely(.f = get_cnc_stats)
 
 
 # test
-filtered_project_results_test <- purrr::map(cnc_sheet$project_id, safely_get_cnc_stats)
-
-
-
-
-
-
-
+filtered_project_results_test <- purrr::map(cnc_sheet$project_id[1:30], safely_get_cnc_stats)
 
 
 ###############################################################################
